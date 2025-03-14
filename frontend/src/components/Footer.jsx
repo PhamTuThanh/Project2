@@ -22,8 +22,8 @@ const Footer = () => {
         </div>
  {/* right section */}
         <div>
-            <p>GET IN TOUNCH</p>
-            <ul>
+            <p className='text-xl font-medium mb-5'>GET IN TOUNCH</p>
+            <ul className='flex flex-col gap-2 text-gray-600'>
                 <li>0345449944</li>
                 <li>phamtuthanh0410@gmail.com</li>
             </ul>
