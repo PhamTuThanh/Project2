@@ -1,5 +1,4 @@
 import { createContext, useEffect, useState } from "react";
-import { doctors } from "../assets/assets";
 import  axios  from 'axios';
 import { toast } from "react-toastify";
 
@@ -42,18 +41,19 @@ const AppContextProvider = ({ children }) => {
     }
 
     const value = {
-        doctors, currencySymbol
+        doctors, getDoctorsData, currencySymbol
         ,token, setToken, backendUrl
         ,userData, setUserData
         ,loadUserProfileData
     }
-    useEffect(()=>{
-        if(token){
-            loadUserProfileData()
-        }else{
-            setUserData(false)
+    useEffect(() => {
+        if (token) {
+            loadUserProfileData();
+        } else {
+            setUserData(false);
         }
-    })
+    }, [token]); 
+    
 
     useEffect(()=>{
         getDoctorsData()
