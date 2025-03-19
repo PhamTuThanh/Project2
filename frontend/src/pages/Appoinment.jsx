@@ -22,7 +22,7 @@ const Appoinment = () => {
     const docInfo = doctors.find(doc => doc._id === docId);
     setDocInfo(docInfo);
   };
-//hhhh
+
 const getAvailableSlots = () => {
   let today = new Date();
   let slots = [];
@@ -41,10 +41,24 @@ const getAvailableSlots = () => {
     let timeSlots = [];
     while (currentDate < endTime) {
       let formattedTime = currentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      timeSlots.push({
-        datetime: new Date(currentDate),
-        time: formattedTime,
-      });
+
+      let day = currentDate.getDate()
+      let month = currentDate.getMonth()+1
+      let year = currentDate.getFullYear()
+
+      const slotDate = day + "_" + month + "_" + year
+      const slotTime = formattedTime
+
+      const isSlotAvailable = docInfo.slot_booked[slotDate] && docInfo.slot_booked[slotDate].includes(slotTime) ? false : true
+
+      if(isSlotAvailable){
+        //add slot to array
+        timeSlots.push({
+                datetime: new Date(currentDate),
+                time: formattedTime,
+              });
+      }
+      //Increment current time by 30 minutes
       currentDate.setMinutes(currentDate.getMinutes() + 30);
     }
     slots.push(timeSlots);

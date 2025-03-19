@@ -2,9 +2,10 @@ import validator from 'validator'
 import bcrypt from 'bcrypt'
 import userModel from '../models/userModel.js';
 import jwt from 'jsonwebtoken';
-import {v2 as cloudinary} from 'cloudinary'
+import { v2 as cloudinary } from 'cloudinary'
 import doctorModel from './../models/doctorModel.js';
 import appoinmentModel from '../models/appoinmentModel.js';
+//import razorpay from 'razorpay'
 
 const registerUser = async (req, res) => {
     try {
@@ -74,13 +75,13 @@ const updateProfile = async (req, res) => {
         }
         await userModel.findByIdAndUpdate(userId, { name, phone, address: JSON.parse(address), dob, gender })
 
-        if(imageFile){
-            const imageUpload = await cloudinary.uploader.upload(imageFile.path,{resource_type:'image'})
+        if (imageFile) {
+            const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: 'image' })
             const imageURL = imageUpload.secure_url
 
-            await userModel.findByIdAndUpdate(userId, {image:imageURL})
+            await userModel.findByIdAndUpdate(userId, { image: imageURL })
         }
-        res.json({success:true, message:"Profile Updated"})
+        res.json({ success: true, message: "Profile Updated" })
     } catch (error) {
         console.log(error)
         res.json({ success: false, message: error.message })
@@ -89,49 +90,96 @@ const updateProfile = async (req, res) => {
 //API to book appoinment
 const bookAppoinment = async (req, res) => {
     try {
-      const { userId, docId, slotDate, slotTime } = req.body;
-      const docData = await doctorModel.findById(docId).select('-password');
-  
-      if (!docData.available) {
-        return res.json({ success: false, message: 'Doctor not available' });
-      }
-  
-      let slot_booked = docData.slot_booked || {};
-  
-      // Checking for slot availability
-      if (slot_booked[slotDate]) {
-        if (slot_booked[slotDate].includes(slotTime)) {
-          return res.json({ success: false, message: 'Slot not available' });
-        } else {
-          slot_booked[slotDate].push(slotTime);
+        const { userId, docId, slotDate, slotTime } = req.body;
+        const docData = await doctorModel.findById(docId).select('-password');
+
+        if (!docData.available) {
+            return res.json({ success: false, message: 'Doctor not available' });
         }
-      } else {
-        slot_booked[slotDate] = [slotTime];
-      }
-  
-      const userData = await userModel.findById(userId).select('-password');
-      delete docData.slot_booked;
-  
-      const appoinmentData = {
-        userId,
-        docId,
-        userData,
-        docData,
-        amount: docData.fees,
-        slotTime,
-        slotDate,
-        date: Date.now(),
-      };
-  
-      const newAppoinment = new appoinmentModel(appoinmentData);
-      await newAppoinment.save();
-  
-      // Save new slots data in docData
-      await doctorModel.findByIdAndUpdate(docId, { slot_booked });
-      res.json({ success: true, message: 'Appoinment Booked' });
+
+        let slot_booked = docData.slot_booked || {};
+
+        // Checking for slot availability
+        if (slot_booked[slotDate]) {
+            if (slot_booked[slotDate].includes(slotTime)) {
+                return res.json({ success: false, message: 'Slot not available' });
+            } else {
+                slot_booked[slotDate].push(slotTime);
+            }
+        } else {
+            slot_booked[slotDate] = [slotTime];
+        }
+
+        const userData = await userModel.findById(userId).select('-password');
+        delete docData.slot_booked;
+
+        const appoinmentData = {
+            userId,
+            docId,
+            userData,
+            docData,
+            amount: docData.fees,
+            slotTime,
+            slotDate,
+            date: Date.now(),
+        };
+
+        const newAppoinment = new appoinmentModel(appoinmentData);
+        await newAppoinment.save();
+
+        // Save new slots data in docData
+        await doctorModel.findByIdAndUpdate(docId, { slot_booked });
+        res.json({ success: true, message: 'Appoinment Booked' });
     } catch (error) {
-      console.log(error);
-      res.json({ success: false, message: error.message });
+        console.log(error);
+        res.json({ success: false, message: error.message });
     }
-  };
-export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment }
+};
+//API to get user appoinments for frontend my-appoinment page
+const listAppoinment = async (req, res) => {
+    try {
+        const {userId} = req.body
+        const appoinments = await appoinmentModel.find({userId})
+        res.json({success:true, appoinments})
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+//API to cancel appoinment
+const cancelAppoinment = async (req, res)=>{
+    try {
+        const {userId, appoinmentId} = req.body
+
+        const appoinmentData = await appoinmentModel.findById(appoinmentId)
+
+        //verify appoinment user
+        if (appoinmentData.userId.toString() !== userId){
+            return res.json({success:false, message: 'Unauthorized action'})
+        }
+        await appoinmentModel.findByIdAndUpdate(appoinmentId, {cancelled:true})
+        //releasing doctor slot
+        const {docId, slotDate, slotTime} = appoinmentData
+        const doctorData = await doctorModel.findById(docId)
+        let slot_booked = doctorData.slot_booked
+        slot_booked[slotDate] = slot_booked[slotDate].filter(e=> e!== slotTime)
+        await doctorModel.findByIdAndUpdate(docId,{slot_booked})
+        res.json({success:true, message:'Appoinment Cancelled'})
+
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+//API to make payment of appoinment using paypal
+// const  razorpayInstance = new razorpay({
+//     key_id:process.env.RAZORPAY_KEY_ID,
+//     key_secret:process.env.RAZORPAY_KEY_SERCRET
+// })
+
+// const paymentRazorpay = async (req, res)=>{
+//     const {appoinmentId} = req.body
+//     const appoinmentData = await appoinmentModel.findById()
+// }
+
+export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment }
