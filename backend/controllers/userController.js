@@ -5,8 +5,15 @@ import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary'
 import doctorModel from './../models/doctorModel.js';
 import appoinmentModel from '../models/appoinmentModel.js';
-//import razorpay from 'razorpay'
+import crypto from 'crypto';
+import querystring from 'querystring';
+import axios from 'axios';
+import moment from 'moment';
+import dotenv from 'dotenv';
 
+const ZALOPAY_APP_ID = process.env.ZALOPAY_APP_ID;
+const ZALOPAY_KEY1 = process.env.ZALOPAY_KEY1;
+const ZALOPAY_ENDPOINT = 'https://sandbox.zalopay.vn/v001/tpe/createorder';
 const registerUser = async (req, res) => {
     try {
         const { name, email, password } = req.body
@@ -171,15 +178,97 @@ const cancelAppoinment = async (req, res)=>{
         res.json({ success: false, message: error.message });
     }
 }
-//API to make payment of appoinment using paypal
-// const  razorpayInstance = new razorpay({
-//     key_id:process.env.RAZORPAY_KEY_ID,
-//     key_secret:process.env.RAZORPAY_KEY_SERCRET
-// })
-
-// const paymentRazorpay = async (req, res)=>{
-//     const {appoinmentId} = req.body
-//     const appoinmentData = await appoinmentModel.findById()
-// }
-
-export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment }
+//API to make payment of appoinment using vnpay
+const makeVNPayPayment = async (req, res) => {
+    try {
+      const { userId, docId, slotDate, slotTime } = req.body;
+      const docData = await doctorModel.findById(docId).select('-password');
+  
+      if (!docData.available) {
+        return res.json({ success: false, message: 'Doctor not available' });
+      }
+  
+      const tmnCode = process.env.vnp_TmnCode;
+      const secretKey = process.env.vnp_HashSecret;
+      const vnpUrl = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+      const returnUrl = 'http://localhost:5173/my-appoinments'; 
+  
+      const date = new Date();
+      const createDate = date.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+      const orderId = date.getTime().toString();
+      const amount = docData.fees * 25000; 
+  
+      const ipAddr = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  
+      const params = {
+        vnp_Version: '2.1.0',
+        vnp_Command: 'pay',
+        vnp_TmnCode: tmnCode,
+        vnp_Locale: 'vn',
+        vnp_CurrCode: 'VND',
+        vnp_TxnRef: orderId,
+        vnp_OrderInfo: `Payment for appointment with doctor ${docData.name}`,
+        vnp_OrderType: 'billpayment',
+        vnp_Amount: amount,
+        vnp_ReturnUrl: returnUrl,
+        vnp_IpAddr: ipAddr,
+        vnp_CreateDate: createDate,
+      };
+  
+      const sortedParams = Object.keys(params).sort().reduce((result, key) => {
+        result[key] = params[key];
+        return result;
+      }, {});
+  
+      const signData = querystring.stringify(sortedParams, { encode: false });
+      const hmac = crypto.createHmac('sha512', secretKey);
+      const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+  
+      sortedParams.vnp_SecureHash = signed;
+      const paymentUrl = `${vnpUrl}?${querystring.stringify(sortedParams)}`;
+  
+      res.json({ success: true, paymentUrl });
+    } catch (error) {
+      console.log(error);
+      res.json({ success: false, message: error.message });
+    }
+  };
+  
+  // API to handle VNPay return URL
+  const vnpayReturn = async (req, res) => {
+    try {
+      const vnpParams = req.query;
+      const secureHash = vnpParams['vnp_SecureHash'];
+  
+      delete vnpParams['vnp_SecureHash'];
+      delete vnpParams['vnp_SecureHashType'];
+  
+      const sortedParams = Object.keys(vnpParams).sort().reduce((result, key) => {
+        result[key] = vnpParams[key];
+        return result;
+      }, {});
+  
+      const signData = querystring.stringify(sortedParams, { encode: false });
+      const secretKey = process.env.vnp_HashSecret;
+      const hmac = crypto.createHmac('sha512', secretKey);
+      const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+  
+      if (secureHash === signed) {
+        const { vnp_TxnRef, vnp_Amount, vnp_ResponseCode } = vnpParams;
+  
+        if (vnp_ResponseCode === '00') {
+    
+          res.json({ success: true, message: 'Payment successful' });
+        } else {
+          res.json({ success: false, message: 'Payment failed' });
+        }
+      } else {
+        res.json({ success: false, message: 'Invalid signature' });
+      }
+    } catch (error) {
+      console.log(error);
+      res.json({ success: false, message: error.message });
+    }
+  };
+  
+  export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, vnpayReturn, makeVNPayPayment };

@@ -5,6 +5,8 @@ import doctorModel from '../models/doctorModel.js';
 import jwt from 'jsonwebtoken'
 import appoinmentModel from './../models/appoinmentModel.js';
 import userModel from './../models/userModel.js';
+import Doctor from "../models/doctorModel.js";
+
 
 //API for adding doctor
 const addDoctor = async (req, res) => {
@@ -133,5 +135,21 @@ const adminDashboard = async (req, res)=>{
         res.json({ success: false, message: error.message });
     }
 }
+const deleteDoctor = async (req, res) => {
+    try {
+        const { docId } = req.body;
+        if (!docId) {
+            return res.status(400).json({ success: false, message: "Doctor ID is required" });
+        }
+        const deletedDoctor = await Doctor.findByIdAndDelete(docId);  
+        if (!deletedDoctor) {
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+        }
+        res.status(200).json({ success: true, message: "Doctor deleted successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
 
-export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard };
+export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor };

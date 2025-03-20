@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment} from '../controllers/userController.js';
+import { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, vnpayReturn, makeVNPayPayment} from '../controllers/userController.js';
 import authUser from '../middlewares/authUser.js';
 import upload from './../middlewares/multer.js';
 
@@ -11,5 +11,7 @@ userRouter.post('/update-profile', upload.single('image'), authUser, updateProfi
 userRouter.post('/book-appoinment', authUser, bookAppoinment)
 userRouter.get('/appoinments', authUser, listAppoinment)
 userRouter.post('/cancel-appoinment', authUser, cancelAppoinment)
+userRouter.post('/make-vnpay-payment', authUser, makeVNPayPayment)
+userRouter.get('/vnpay-return', vnpayReturn)
 
 export default userRouter;
