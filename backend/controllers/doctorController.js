@@ -91,6 +91,21 @@ const appoinmentCancel = async(req, res) =>{
         res.json({ success: false, message: error.message });
     }
 }
+const refundStatus = async(req, res) =>{
+    try {
+        const {docId, appoinmentId} = req.body
+        const appoinmentData = await appoinmentModel.findById(appoinmentId)
+        if(appoinmentData && appoinmentData.docId == docId){
+            await appoinmentModel.findByIdAndUpdate(appoinmentId, {refund:true})
+            return res.json({success:true, message:'Refunded'})
+        }else{
+            return res.json({success:false, message:'Refund failed'})
+        }
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
 //api to get dashboard data for doctor panel
 const doctorDashboard = async (req,res)=>{
     try {
@@ -143,5 +158,5 @@ const updateDoctorProfile = async(req, res) =>{
         res.json({ success: false, message: error.message });
     }
 }
-export { changeAvailability, doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile, updateDoctorProfile };
+export { changeAvailability, doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile, updateDoctorProfile, refundStatus };
 

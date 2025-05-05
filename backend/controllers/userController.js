@@ -1,19 +1,14 @@
 import validator from 'validator'
 import bcrypt from 'bcrypt'
 import userModel from '../models/userModel.js';
+import studentModel from '../models/studentModel.js';
 import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary'
 import doctorModel from './../models/doctorModel.js';
 import appoinmentModel from '../models/appoinmentModel.js';
-import crypto from 'crypto';
-import querystring from 'querystring';
-import axios from 'axios';
-import moment from 'moment';
-import dotenv from 'dotenv';
+import paypal from 'paypal-rest-sdk';
+import { sendAppointmentNotification } from '../utils/emailService.js';
 
-const ZALOPAY_APP_ID = process.env.ZALOPAY_APP_ID;
-const ZALOPAY_KEY1 = process.env.ZALOPAY_KEY1;
-const ZALOPAY_ENDPOINT = 'https://sandbox.zalopay.vn/v001/tpe/createorder';
 const registerUser = async (req, res) => {
     try {
         const { name, email, password } = req.body
@@ -43,23 +38,37 @@ const registerUser = async (req, res) => {
     }
 }
 const loginUser = async (req, res) => {
-    try {
-        const { email, password } = req.body
-        const user = await userModel.findOne({ email })
-        if (!user) {
-            return res.json({ success: false, message: 'User does not exist' })
-        }
-        const isMatch = await bcrypt.compare(password, user.password)
-        if (isMatch) {
-            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET)
-            res.json({ success: true, token })
-        } else {
-            res.json({ success: false, message: "Invalid credentials" })
-        }
-    } catch (error) {
-        console.log(error)
-        res.json({ success: false, message: error.message })
-    }
+  try {
+      const { email, password } = req.body;
+
+      let user = await userModel.findOne({ email });
+      if (user) {
+          const isMatch = await bcrypt.compare(password, user.password);
+          if (isMatch) {
+              const token = jwt.sign({ id: user._id, role: 'user' }, process.env.JWT_SECRET);
+              return res.json({ success: true, token, role: 'user' });
+          } else {
+              return res.json({ success: false, message: "Invalid credentials" });
+          }
+      }
+
+      const student = await studentModel.findOne({ email });
+      if (student) {
+          const isMatch = await bcrypt.compare(password, student.password);
+          if (isMatch) {
+              const token = jwt.sign({ id: student._id, role: 'student' }, process.env.JWT_SECRET);
+              return res.json({ success: true, token, role: 'student' });
+          } else {
+              return res.json({ success: false, message: "Invalid credentials" });
+          }
+      }
+
+      // Nếu không tìm thấy trong cả hai model
+      return res.json({ success: false, message: 'User does not exist' });
+  } catch (error) {
+      console.log(error);
+      res.json({ success: false, message: error.message });
+  } 
 }
 //API to get user profile data
 const getProfile = async (req, res) => {
@@ -71,6 +80,7 @@ const getProfile = async (req, res) => {
         console.log(error)
         res.json({ success: false, message: error.message })
     }
+    
 }
 //API to update user profile 
 const updateProfile = async (req, res) => {
@@ -136,7 +146,18 @@ const bookAppoinment = async (req, res) => {
 
         // Save new slots data in docData
         await doctorModel.findByIdAndUpdate(docId, { slot_booked });
-        res.json({ success: true, message: 'Appoinment Booked' });
+
+        // Send email notifications
+        try {
+            const emailResult = await sendAppointmentNotification(appoinmentData);
+            if (!emailResult.success) {
+                console.error('Failed to send email notifications:', emailResult.error);
+            }
+        } catch (emailError) {
+            console.error('Email notification error:', emailError);
+        }
+
+        res.json({ success: true, message: 'Appointment Booked' });
     } catch (error) {
         console.log(error);
         res.json({ success: false, message: error.message });
@@ -178,97 +199,120 @@ const cancelAppoinment = async (req, res)=>{
         res.json({ success: false, message: error.message });
     }
 }
-//API to make payment of appoinment using vnpay
-const makeVNPayPayment = async (req, res) => {
+paypal.configure({
+    mode: 'sandbox', // Use 'live' for production
+    client_id: process.env.PAYPAL_CLIENT_ID,
+    client_secret: process.env.PAYPAL_CLIENT_SECRET,
+  });
+
+  const createPayPalPayment = async (req, res) => {
     try {
-      const { userId, docId, slotDate, slotTime } = req.body;
-      const docData = await doctorModel.findById(docId).select('-password');
+      const { amount, description, appointmentId } = req.body;
   
-      if (!docData.available) {
-        return res.json({ success: false, message: 'Doctor not available' });
-      }
-  
-      const tmnCode = process.env.vnp_TmnCode;
-      const secretKey = process.env.vnp_HashSecret;
-      const vnpUrl = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
-      const returnUrl = 'http://localhost:5173/my-appoinments'; 
-  
-      const date = new Date();
-      const createDate = date.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-      const orderId = date.getTime().toString();
-      const amount = docData.fees * 25000; 
-  
-      const ipAddr = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  
-      const params = {
-        vnp_Version: '2.1.0',
-        vnp_Command: 'pay',
-        vnp_TmnCode: tmnCode,
-        vnp_Locale: 'vn',
-        vnp_CurrCode: 'VND',
-        vnp_TxnRef: orderId,
-        vnp_OrderInfo: `Payment for appointment with doctor ${docData.name}`,
-        vnp_OrderType: 'billpayment',
-        vnp_Amount: amount,
-        vnp_ReturnUrl: returnUrl,
-        vnp_IpAddr: ipAddr,
-        vnp_CreateDate: createDate,
+      const paymentData = {
+        intent: 'sale',
+        payer: {
+          payment_method: 'paypal',
+        },
+        redirect_urls: {
+          return_url: `http://localhost:9000/api/user/paypal-success?appointmentId=${appointmentId}&redirect_to=http://localhost:5173/my-appoinments`,
+          cancel_url: 'http://localhost:9000/api/user/paypal-cancel',
+        },
+        transactions: [
+          {
+            amount: {
+              total: amount.toFixed(2),
+              currency: 'USD',
+            },
+            description,
+          },
+        ],
       };
   
-      const sortedParams = Object.keys(params).sort().reduce((result, key) => {
-        result[key] = params[key];
-        return result;
-      }, {});
-  
-      const signData = querystring.stringify(sortedParams, { encode: false });
-      const hmac = crypto.createHmac('sha512', secretKey);
-      const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-  
-      sortedParams.vnp_SecureHash = signed;
-      const paymentUrl = `${vnpUrl}?${querystring.stringify(sortedParams)}`;
-  
-      res.json({ success: true, paymentUrl });
-    } catch (error) {
-      console.log(error);
-      res.json({ success: false, message: error.message });
-    }
-  };
-  
-  // API to handle VNPay return URL
-  const vnpayReturn = async (req, res) => {
-    try {
-      const vnpParams = req.query;
-      const secureHash = vnpParams['vnp_SecureHash'];
-  
-      delete vnpParams['vnp_SecureHash'];
-      delete vnpParams['vnp_SecureHashType'];
-  
-      const sortedParams = Object.keys(vnpParams).sort().reduce((result, key) => {
-        result[key] = vnpParams[key];
-        return result;
-      }, {});
-  
-      const signData = querystring.stringify(sortedParams, { encode: false });
-      const secretKey = process.env.vnp_HashSecret;
-      const hmac = crypto.createHmac('sha512', secretKey);
-      const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-  
-      if (secureHash === signed) {
-        const { vnp_TxnRef, vnp_Amount, vnp_ResponseCode } = vnpParams;
-  
-        if (vnp_ResponseCode === '00') {
-    
-          res.json({ success: true, message: 'Payment successful' });
-        } else {
-          res.json({ success: false, message: 'Payment failed' });
+      paypal.payment.create(paymentData, (error, payment) => {
+        if (error) {
+          console.error(error);
+          return res.json({ success: false, message: 'Payment creation failed' });
         }
-      } else {
-        res.json({ success: false, message: 'Invalid signature' });
-      }
+  
+        const approvalUrl = payment.links.find((link) => link.rel === 'approval_url').href;
+        res.json({ success: true, approvalUrl });
+      });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       res.json({ success: false, message: error.message });
     }
   };
+
+  const handlePayPalSuccess = async (req, res) => {
+    try {
+      const { paymentId, PayerID, appointmentId, redirect_to } = req.query;
   
-  export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, vnpayReturn, makeVNPayPayment };
+      const executePaymentData = {
+        payer_id: PayerID,
+      };
+  
+      paypal.payment.execute(paymentId, executePaymentData, async (error, payment) => {
+        if (error) {
+          console.error(error);
+          return res.json({ success: false, message: 'Payment execution failed' });
+        }
+  
+        try {
+          await appoinmentModel.findByIdAndUpdate(appointmentId, { payment: true });
+          // Redirect to frontend after successful database update
+          res.redirect(redirect_to || 'http://localhost:5173/my-appoinments');
+          res.json({success:true, message:'Payment Done'})
+        } catch (dbError) {
+          console.error('Database update error:', dbError);
+          res.redirect('http://localhost:5173/my-appoinments?error=update_failed');
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      res.redirect('http://localhost:5173/my-appoinments?error=payment_failed');
+    }
+  };
+
+  const handlePayPalCancel = (req, res) => {
+    res.json({ success: false, message: 'Payment cancelled by user' });
+  };
+  // const refundStatus = async (req, res) =>{
+  //   try {
+  //     const {userId, appoinmentId} = req.body
+  //     const appoinmentData = await appoinmentModel.findById(appoinmentId)
+  //     if (appoinmentData.userId.toString() !== userId){
+  //       return res.json({success:false, message: 'Unauthorized action'})
+  //     }
+  //     await appoinmentModel.findByIdAndUpdate(appoinmentId, {refund:true})
+  //     return res.json({success:true, message:'Refunded'})
+  //   } catch (error) {
+  //     console.log(error);
+  //     res.json({ success: false, message: error.message });
+  //   }
+  // }
+  const sendEmail = async (req, res) =>{
+    try {
+      const {to, subject, text} = req.body
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.SMTP_USERNAME,
+          pass: process.env.SMTP_PASSWORD
+        }
+      })
+      const mailOptions = {
+        from: process.env.SMTP_USERNAME,
+        to,
+        subject,
+        text
+      }
+      await transporter.sendMail(mailOptions)
+      res.json({success:true, message:'Email sent'})
+    } catch (error) {
+      console.log(error);
+      res.json({success:false, message:error.message})
+    }
+  }
+
+  export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment,  createPayPalPayment, handlePayPalSuccess, handlePayPalCancel, sendEmail};
