@@ -24,8 +24,9 @@ const DoctorsList = () => {
                     <div className='mt-2 flex items-center gap-1 text-sm'>
                       <input onChange={()=>changeAvailability(item._id)} type="checkbox" checked={item.available} />
                       <p>Available</p>
+                      <button onClick={() => deleteDoctor(item._id)} className='  ml-10 text-sm hover:text-red-500'>Delete</button>
                     </div>
-                    <button onClick={() => deleteDoctor(item._id)} className=' flex flex-col mt-2 text-sm text-red-500'>Delete</button>
+                    
                  </div>
               </div>
             ))

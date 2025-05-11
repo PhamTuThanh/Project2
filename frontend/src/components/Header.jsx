@@ -1,27 +1,46 @@
-import React from 'react'
-import { assets } from '../assets/assets'
+import React, { useContext } from 'react';
+import { AppContext } from '../context/AppContext';
+import { assets } from '../assets/assets';
 
 const Header = () => {
-  return (
-    <div className='flex flex-col md:flex-row flex-wrap bg-secondary rounded-lg px-6 md:px-10 lg:px-20'>
-{/* left side */}
-      <div className='md:w-1/2 flex flex-col items-start justify-center gap-4 py-10 m-auto md:py-[10vw] md:mb-[-30px]'>
-        <p className='text-3xl md:text-4xl lg:text-5xl text-white font-semibold leading-tight md:leading-tight lg:leading-tight'>
-            Book Appoinment <br /> With Trusted Doctors
-        </p>
-        <div className='flex flex-col md:flex-row items-center gap-3 text-white text-sm font-light'>
-            <img className='w-28' src={assets.group_profiles} alt="" />
-            <p>Simply browse though our extensive list of trusted doctors, <br className='hidden sm:block' />schedule your appoinment hassle-free</p>
-        </div>
-        <a href="#speciality" className='flex items-center gap-2 bg-white px-8 py-3 rounded-full text-gray-600 text-sm m-auto md:m-0 hover:scale-105 transition-all duration-300'>
-            Book appoinment <img className='w-3' src={assets.arrow_icon} alt="" /></a>
-      </div>
- {/* right side */}
-        <div className='md:w-1/2 relative'>
-            <img className='w-full md:absolute bottom-0 h-auto rounded-lg' src={assets.header_img} alt="" />
-        </div>
-    </div>
-  )
-}
+  const { userData } = useContext(AppContext);
 
-export default Header
+  const navItems = [
+    { label: 'Appointment', icon: assets.schedule_an_appoinment, link: '/doctors' },
+    { label: 'Messages', icon: assets.messange, link: '/messages' },
+    { label: 'Visits', icon: assets.visits, link: '/visits' },
+    { label: 'Test Results', icon: assets.test_result, link: '/test-results' },
+    { label: 'Billing', icon: assets.billing, link: '/billing-summary' },
+  ];
+
+  return (
+    <div className="flex flex-col md:flex-row flex-wrap bg-secondary rounded-lg px-6 md:px-10 lg:px-20">
+      {/* Left Side */}
+      <div className="md:w-1/2 flex flex-col items-start justify-center gap-4 py-10 m-auto  md:mb-[-30px]">
+        <p className=" pr-[50px] text-xl justify-center md:text-3xl lg:text-4xl text-white font-semibold leading-tight md:leading-tight lg:leading-tight">
+          Welcome, {userData.name}!
+        </p>
+      </div>
+
+      {/* Navigation Items */}
+      <div className="flex sm:justify-center gap-4 pt-5 w-full overflow-scroll pb-3">
+        {navItems.map((item, index) => (
+          <a
+            key={index}
+            href={item.link}
+            className="bg-white w-[100px] pt-2 flex flex-col items-center text-sm flex-shrink-0 border-2 rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300"
+          >
+            <img
+              className="w-35 h-10 cursor-pointer hover:translate-y-[-2px] transition-all duration-500"
+              src={item.icon}
+              alt={item.label}
+            />
+            <p className="mt-2 text-center text-base font-medium pb-2">{item.label}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default Header;

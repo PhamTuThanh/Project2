@@ -6,6 +6,10 @@ import connectCloudinary from "./config/cloudinary.js"
 import adminRouter from './routes/adminRoute.js';
 import doctorRouter from "./routes/doctorRoute.js";
 import userRouter from "./routes/userRoute.js";
+import reminderRouter from "./routes/reminderRoute.js";
+import cron from 'node-cron';
+import { checkAndSendReminders } from './controllers/reminderController.js';
+import studentRouter from './routes/studentRoute.js';
 
 //app config
 const app = express()
@@ -21,10 +25,16 @@ app.use(express.json())
 app.use('/api/admin', adminRouter);
 app.use('/api/doctor', doctorRouter)
 app.use('/api/user', userRouter);
+app.use('/api/reminder', reminderRouter);
+app.use('/api', studentRouter);
 
+// Schedule reminder check every 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+    console.log('Running reminder check...');
+    await checkAndSendReminders();
+});
 
-app.get("/", (req, res) => res.status(200).send("Hello World!"))
-
+// app.get("/", (req, res) => res.status(200).send("Hello World!"))
 
 //listen
 app.listen(port, () => console.log(`Listening on localhost:${port}`))

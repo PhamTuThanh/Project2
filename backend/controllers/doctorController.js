@@ -2,6 +2,10 @@ import doctorModel from '../models/doctorModel.js';
 import bcrypt from 'bcrypt'
 import jwt  from 'jsonwebtoken';
 import appoinmentModel from './../models/appoinmentModel.js';
+import physicalFitnessModel from '../models/physicalFitnessModel.js';
+
+
+
 
 const changeAvailability = async (req, res) => {
     try {
@@ -91,6 +95,21 @@ const appoinmentCancel = async(req, res) =>{
         res.json({ success: false, message: error.message });
     }
 }
+const refundStatus = async(req, res) =>{
+    try {
+        const {docId, appoinmentId} = req.body
+        const appoinmentData = await appoinmentModel.findById(appoinmentId)
+        if(appoinmentData && appoinmentData.docId == docId){
+            await appoinmentModel.findByIdAndUpdate(appoinmentId, {refund:true})
+            return res.json({success:true, message:'Refunded'})
+        }else{
+            return res.json({success:false, message:'Refund failed'})
+        }
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
 //api to get dashboard data for doctor panel
 const doctorDashboard = async (req,res)=>{
     try {
@@ -143,5 +162,30 @@ const updateDoctorProfile = async(req, res) =>{
         res.json({ success: false, message: error.message });
     }
 }
-export { changeAvailability, doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile, updateDoctorProfile };
+
+const savePhysicalFitness = async (req, res) => {
+  try {
+    const data = req.body;
+    // Nếu muốn update theo studentId + followDate (không cho trùng), dùng upsert:
+    await physicalFitnessModel.findOneAndUpdate(
+      { studentId: data.studentId, followDate: data.followDate },
+      data,
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, message: 'Lưu thành công!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Lỗi server!' });
+  }
+};
+const getAllPhysicalFitness = async (req, res) => {
+    try {
+      const data = await physicalFitnessModel.find({});
+      res.json({ success: true, data });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Lỗi server!' });
+    }
+  };
+
+export { changeAvailability, doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile, updateDoctorProfile, refundStatus, savePhysicalFitness, getAllPhysicalFitness };
 

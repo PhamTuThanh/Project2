@@ -7,7 +7,6 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import MyProfile from './pages/MyProfile';
 import MyAppoinments from './pages/MyAppoinments';
-import VNPayReturn from './pages/VNPayReturn';
 import Appoinment from './pages/Appoinment';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -28,7 +27,6 @@ const App = () => {
         <Route path='/contact' element={<Contact />}/>
         <Route path='/my-profile' element={<MyProfile />}/>
         <Route path='/my-appoinments' element={<MyAppoinments />}/>
-        <Route path="/vnpay-return" element={<VNPayReturn />} />
         <Route path='/appoinment/:docId' element={<Appoinment />}/>
       </Routes>
       <Footer />

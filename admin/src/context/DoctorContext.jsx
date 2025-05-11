@@ -55,6 +55,20 @@ const DoctorContextProvider = ({ children }) => {
             toast.error(error.message)
         }
     }
+    const refundStatus = async (appoinmentId)=>{
+        try {
+            const {data} = await axios.post(backendUrl+'/api/doctor/refund-status', {appoinmentId}, {headers:{dToken}})
+            if(data.success){
+                toast.success(data.message)
+                getAppoinments()
+            }else{
+                toast.error(data.message)
+            }
+        } catch (error) {
+            console.log(error)
+            toast.error(error.message)
+        }
+    }
     const getDashData = async ()=>{
         try {
             const {data} = await axios.get(backendUrl + '/api/doctor/dashboard', {headers:{dToken}})
@@ -87,7 +101,7 @@ const DoctorContextProvider = ({ children }) => {
         getAppoinments,completeAppoinment
         , cancelAppoinment, dashData,
         setDashData, getDashData, profileData,
-        setProfileData, getProfileData
+        setProfileData, getProfileData, refundStatus
     };
 
     return (
