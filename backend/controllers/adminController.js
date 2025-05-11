@@ -78,6 +78,11 @@ const addStudent = async (req, res) => {
         if (password.length < 8) {
             return res.json({ success: false, message: "Please enter a stronger password" });
         }
+        //no duplicate student id
+        const duplicateStudent = await studentModel.findOne({studentId})
+        if(duplicateStudent){
+            return res.json({success:false, message:'Student ID already exists'})
+        }
         // Hashing student password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -207,4 +212,19 @@ const deleteDoctor = async (req, res) => {
     }
 };
 
-export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent };
+//API to get student list by cohort and major
+const listStudents = async (req, res) => {
+    try {
+        const { cohort, major } = req.body;
+        if (!cohort || !major) {
+            return res.json({ success: false, message: 'Missing cohort or major' });
+        }
+        const students = await studentModel.find({ cohort, major }).select('-password');
+        res.json({ success: true, students });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents };

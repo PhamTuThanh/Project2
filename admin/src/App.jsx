@@ -15,6 +15,9 @@ import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import DoctorAppoinments from './pages/Doctor/DoctorAppoinments';
 import DoctorProfile from './pages/Doctor/DoctorProfile';
 import AddStudent from './pages/Admin/AddStudent';
+import StudentList from './pages/Admin/StudentList';
+import TrackHealth from './pages/Doctor/TrackHealth';
+import PhysicalFitness from './pages/Doctor/PhysicalFitness';
 
 const App = () => {
   const {aToken} = useContext(AdminContext)
@@ -34,10 +37,13 @@ const App = () => {
             <Route path='/add-doctor' element={<AddDoctor/>}/>
             <Route path='/doctor-list' element={<DoctorsList/>}/>
             <Route path='/add-student' element={<AddStudent/>}/>
+            <Route path='/student-list' element={<StudentList/>}/>
             {/* doctor route */}
             <Route path='/doctor-dashboard' element={<DoctorDashboard/>}/>
             <Route path='/doctor-appoinments' element={<DoctorAppoinments/>}/>
             <Route path='/doctor-profile' element={<DoctorProfile/>}/>
+            <Route path='/track-health' element={<TrackHealth/>}/>
+            <Route path='/add-physical-fitness' element={<PhysicalFitness/>}/>
          </Routes>
       </div>
     </div>

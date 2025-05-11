@@ -1,5 +1,5 @@
 import React from 'react'
-import { specialityData } from '../assets/assets'
+import { assets, specialityData } from '../assets/assets'
 import { Link } from 'react-router-dom'
 
 
@@ -9,6 +9,7 @@ const SpecialityMenu = () => {
         <h1 className='text-3xl font-mediumm'>Find by Speciality</h1>
         <p className='sm:w-1/3 text-center text-sm'>Simply browse through our extensive list of trusted doctors, schedule your appointment hassle-free.</p>
         <div className='flex sm:justify-center gap-4 pt-5 w-full overflow-scroll'>
+
             {specialityData.map((item, index) => (
                 <Link 
                 onClick={() => scrollTo(0, 0)}
